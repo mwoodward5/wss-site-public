@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>WSS — Claim Your Preview Site</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --card-border: #1f293d;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --accent: #38bdf8;
+      --ok: #10b981;
+      --ok-bg: rgba(16, 185, 129, 0.12);
+      --warn: #f59e0b;
+      --warn-bg: rgba(245, 158, 11, 0.12);
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background-color: var(--bg); color: var(--text-main); font-family: var(--font-sans); padding: 24px; line-height: 1.5; }
+    .container { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--card-border); flex-wrap: wrap; gap: 12px; }
+    .title-group h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .title-group p { font-size: 13px; color: var(--text-muted); font-family: var(--font-mono); }
+    .pill { display: flex; align-items: center; gap: 8px; font-size: 12px; font-family: var(--font-mono); background: var(--card-bg); border: 1px solid var(--card-border); padding: 6px 12px; border-radius: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+    .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 16px 20px; }
+    .card-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 12px; }
+    .muted { color: var(--text-muted); font-size: 13px; }
+    .mono { font-family: var(--font-mono); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 11px; font-family: var(--font-mono); }
+    .badge-warn { background: var(--warn-bg); color: var(--warn); }
+    .badge-ok { background: var(--ok-bg); color: var(--ok); }
+    .big-value { font-size: 26px; font-weight: 700; font-family: var(--font-mono); letter-spacing: 0.02em; }
+    .kv { display: grid; grid-template-columns: 170px 1fr; gap: 6px 14px; font-size: 13px; font-family: var(--font-mono); }
+    .kv .k { color: var(--text-muted); }
+    input[type="text"] {
+      width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.03); color: var(--text-main); font-family: var(--font-mono); font-size: 14px;
+    }
+    input[type="text"]:focus { outline: 1px solid var(--accent); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    button {
+      padding: 10px 18px; border-radius: 6px; border: 1px solid var(--accent);
+      background: rgba(56, 189, 248, 0.12); color: var(--accent); font-weight: 700; font-size: 14px; cursor: pointer;
+    }
+    button.ghost { border-color: var(--card-border); background: rgba(255,255,255,0.03); color: var(--text-main); font-weight: 600; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .note { margin-top: 10px; font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
+    .fine { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); letter-spacing: 0.04em; }
+    a { color: var(--accent); }
+    ul { margin: 8px 0 0 18px; font-size: 13px; color: var(--text-muted); }
+    li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="title-group">
+        <h1>Claim Your Preview Site</h1>
+        <p id="meta">Reading claim reference...</p>
+      </div>
+      <div class="pill"><span class="dot" id="state-dot"></span><span id="state-text">checking</span></div>
+    </header>
+
+    <section class="card">
+      <div class="card-title">1. Your Claim Reference</div>
+      <p class="muted" style="margin-bottom:10px;">Enter the site reference from your preview email (the part before <span class="mono">.wss-ai.com</span>), or open <span class="mono">/claim/?site=&lt;reference&gt;</span>.</p>
+      <form id="ref-form">
+        <div class="row">
+          <input type="text" id="ref-input" placeholder="e.g. roofing" maxlength="64" autocomplete="off" style="flex:1;min-width:220px;" />
+          <button type="submit" id="check-btn">Look up</button>
+        </div>
+      </form>
+      <div class="note" id="ref-note"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">2. Claim State</div>
+      <div class="kv">
+        <span class="k">reference</span><span id="ref-value">—</span>
+        <span class="k">claim state</span><span id="claim-state">—</span>
+        <span class="k">checked at</span><span id="checked-at">—</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">3. Preview Expiry</div>
+      <div class="big-value" id="clock">—</div>
+      <p class="muted" style="margin-top:6px;" id="clock-note">Clock pending — no verified expiry data yet. This page never invents a countdown; the clock only ticks against a real expiry timestamp supplied by the claim backend.</p>
+    </section>
+
+    <section class="card">
+      <div class="card-title">4. Claim &amp; Verify</div>
+      <p class="muted">Claiming makes your preview site permanent (hosting re-pinned, expiry clock disarmed).</p>
+      <div class="row" style="margin-top:12px;">
+        <button type="button" id="claim-btn">Claim &amp; verify this site</button>
+      </div>
+      <div class="note" id="action-note"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-title">About This Page (Honest States)</div>
+      <ul>
+        <li><span class="mono">claim backend pending</span> — the claim lookup endpoint is not deployed on this hub yet, so no live claim state can be shown. Nothing here is simulated.</li>
+        <li><span class="mono">clock pending</span> — expiry countdowns render only from verified backend data (claim expiry timestamp). No fake urgency.</li>
+        <li>The claim button performs <strong>no network write</strong> while the backend is pending; it will not submit anything until a real claim endpoint exists.</li>
+      </ul>
+    </section>
+
+    <p class="fine">Preview sites are private temporary builds. See also <a href="/status">public status</a>.</p>
+  </div>
+
+  <script>
+    "use strict";
+    // Static claim entry point for the hub (ghost.wss-ai.com/claim/).
+    // Deployed per L17 static convention: public/claim/index.html, no server route.
+    // Honesty contract: no invented countdowns, no simulated claim state, no write
+    // actions until the claim backend exists. Sole network target is a same-origin
+    // GET probe that fails soft when the backend is not deployed (expected today).
+
+    var SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+    var PROBE_PATH = "/api/claim/status";
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+      });
+    }
+
+    // Read slug from ?site=<slug> (primary) or #/<slug> (secondary).
+    function readSlug() {
+      try {
+        var q = new URLSearchParams(window.location.search).get("site");
+        if (q) return String(q).trim().toLowerCase();
+        var h = decodeURIComponent(window.location.hash || "").replace(/^#\/?/, "");
+        if (h) return String(h).trim().toLowerCase();
+      } catch (e) { /* fall through */ }
+      return "";
+    }
+
+    function setSlugDisplay(slug) {
+      document.getElementById("ref-value").textContent = slug || "(none provided)";
+      document.getElementById("ref-input").value = slug || "";
+    }
+
+    function setState(ok, text) {
+      document.getElementById("state-dot").className = "dot" + (ok ? " ok" : "");
+      document.getElementById("state-text").textContent = text;
+    }
+
+    // Whitelist-projection of a (future) claim status payload. Only known-safe
+    // fields pass through; everything else is dropped.
+    function sanitizeClaim(raw) {
+      if (!raw || typeof raw !== "object") return null;
+      var out = { available: raw.available === true, state: "unknown", expiresAt: "" };
+      if (typeof raw.state === "string") out.state = raw.state.replace(/[^a-z0-9_]/gi, "").slice(0, 32) || "unknown";
+      if (typeof raw.status === "string" && out.state === "unknown") out.state = raw.status.replace(/[^a-z0-9_]/gi, "").slice(0, 32) || "unknown";
+      var exp = raw.claimExpiresAt || raw.claim_expires_at || raw.expiresAt;
+      if (typeof exp === "string") {
+        var d = new Date(exp);
+        if (!isNaN(d.getTime())) out.expiresAt = d.toISOString();
+      }
+      return out;
+    }
+
+    var clockTimer = null;
+    function renderClock(expiresAtIso) {
+      var clockEl = document.getElementById("clock");
+      var noteEl = document.getElementById("clock-note");
+      if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
+      if (!expiresAtIso) {
+        clockEl.textContent = "clock pending";
+        noteEl.textContent = "No verified expiry data yet. The clock only ticks against a real expiry timestamp supplied by the claim backend — never invented.";
+        return;
+      }
+      var until = new Date(expiresAtIso).getTime();
+      function tick() {
+        var ms = until - Date.now();
+        if (ms <= 0) {
+          clockEl.textContent = "EXPIRED";
+          noteEl.textContent = "The verified claim window has elapsed. Reactivation is handled by the claim flow.";
+          if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
+          return;
+        }
+        var d = Math.floor(ms / 86400000);
+        var h = Math.floor((ms % 86400000) / 3600000);
+        var m = Math.floor((ms % 3600000) / 60000);
+        var s = Math.floor((ms % 60000) / 1000);
+        clockEl.textContent = d + "d " + (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+        noteEl.textContent = "Verified expiry " + expiresAtIso + " — from claim backend data.";
+      }
+      tick();
+      clockTimer = setInterval(tick, 1000);
+    }
+
+    function renderPending(slug, why) {
+      setState(false, "claim backend pending");
+      document.getElementById("claim-state").innerHTML =
+        '<span class="badge badge-warn">claim backend pending</span>';
+      document.getElementById("meta").textContent = why;
+      renderClock("");
+      var note = document.getElementById("ref-note");
+      if (slug && !SLUG_RE.test(slug)) {
+        note.textContent = "Reference not recognized (expected letters, digits, dashes).";
+      } else {
+        note.textContent = "Lookup endpoint not deployed yet — nothing simulated.";
+      }
+    }
+
+    function renderClaim(data) {
+      setState(true, "claim backend reachable");
+      document.getElementById("meta").textContent = "Claim status loaded.";
+      var claimed = data.state === "claimed" || data.state === "active";
+      document.getElementById("claim-state").innerHTML =
+        '<span class="badge ' + (claimed ? "badge-ok" : "badge-warn") + '">' + esc(data.state) + "</span>";
+      if (claimed) {
+        renderClock("");
+        document.getElementById("clock").textContent = "permanent";
+        document.getElementById("clock-note").textContent = "Site claimed — expiry clock disarmed per claim lifecycle.";
+      } else {
+        renderClock(data.expiresAt);
+      }
+    }
+
+    var lastSlug = "";
+    function lookup(slug) {
+      lastSlug = slug;
+      setSlugDisplay(slug);
+      document.getElementById("checked-at").textContent = new Date().toISOString().replace("T", " ").slice(0, 19) + "Z";
+      document.getElementById("action-note").textContent = "";
+
+      if (!slug) {
+        renderPending("", "No claim reference provided — enter one above.");
+        document.getElementById("ref-note").textContent = "";
+        return;
+      }
+      if (!SLUG_RE.test(slug)) {
+        renderPending(slug, "Reference format not recognized.");
+        return;
+      }
+
+      // Sole network action: same-origin GET probe. Expected to 404 today —
+      // that is the honest "claim backend pending" state, not an error page.
+      fetch(PROBE_PATH + "?site=" + encodeURIComponent(slug), { cache: "no-store" })
+        .then(function (res) {
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          return res.json();
+        })
+        .then(function (raw) {
+          var data = sanitizeClaim(raw);
+          if (!data || !data.available) {
+            renderPending(slug, "Claim backend reports unavailable for this reference.");
+            return;
+          }
+          renderClaim(data);
+        })
+        .catch(function () {
+          renderPending(slug, "Claim backend pending — lookup endpoint not deployed on this hub yet.");
+        });
+    }
+
+    // Claim button: explicit no-write contract while backend is pending.
+    document.getElementById("claim-btn").addEventListener("click", function () {
+      var note = document.getElementById("action-note");
+      if (!lastSlug || !SLUG_RE.test(lastSlug)) {
+        note.textContent = "Enter a valid claim reference first.";
+        return;
+      }
+      note.textContent = "Claim backend pending — the claim/verify endpoint is not deployed yet, so no claim was submitted. Nothing was sent.";
+    });
+
+    document.getElementById("ref-form").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var slug = document.getElementById("ref-input").value.trim().toLowerCase();
+      if (slug && SLUG_RE.test(slug)) {
+        try {
+          var u = new URL(window.location.href);
+          u.search = "?site=" + encodeURIComponent(slug);
+          u.hash = "";
+          window.history.replaceState(null, "", u.href);
+        } catch (e) { /* non-fatal */ }
+      }
+      lookup(slug);
+    });
+
+    lookup(readSlug());
+  </script>
+</body>
+</html>

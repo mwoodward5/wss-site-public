@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WSS Factory — Public Status Console</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --card-border: #1f293d;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --accent: #38bdf8;
+      --pass: #10b981;
+      --pass-bg: rgba(16, 185, 129, 0.12);
+      --warn: #f59e0b;
+      --warn-bg: rgba(245, 158, 11, 0.12);
+      --over: #ef4444;
+      --over-bg: rgba(239, 68, 68, 0.14);
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      padding: 24px;
+      line-height: 1.45;
+    }
+    .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .title-group h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .title-group p { font-size: 13px; color: var(--text-muted); font-family: var(--font-mono); }
+    .poll-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--pass);
+      box-shadow: 0 0 8px var(--pass);
+    }
+    .pulse-dot.stale { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px 20px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+    .engine-box {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: var(--font-mono);
+    }
+    .engine-name { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+    .engine-meta { font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 3px; }
+    .engine-md5 { color: var(--text-main); word-break: break-all; }
+
+    /* Scorecard Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--font-mono); }
+    th { text-align: left; padding: 8px 10px; color: var(--text-muted); border-bottom: 1px solid var(--card-border); }
+    td { padding: 8px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.03); white-space: nowrap; }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 11px;
+    }
+    .badge-pass { background: var(--pass-bg); color: var(--pass); }
+    .badge-over { background: var(--over-bg); color: var(--over); }
+    .badge-pending { background: var(--warn-bg); color: var(--warn); }
+
+    /* Funnel Batches */
+    .batch-list { display: flex; flex-direction: column; gap: 10px; }
+    .batch-item {
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .batch-head { display: flex; justify-content: space-between; margin-bottom: 6px; font-weight: 600; }
+    .batch-status-row { display: flex; gap: 16px; flex-wrap: wrap; color: var(--text-muted); }
+    .empty-state { color: var(--text-muted); font-style: italic; }
+
+    /* Tail Tracker */
+    .tail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+    .tail-card {
+      border: 1px solid var(--card-border);
+      background: rgba(239, 68, 68, 0.04);
+      border-left: 3px solid var(--over);
+      border-radius: 4px;
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .tail-card.structural { border-left-color: var(--warn); background: rgba(245, 158, 11, 0.04); }
+    .tail-cat { font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+    .tail-delta { font-size: 11px; color: var(--over); margin-bottom: 4px; }
+    .tail-note { font-size: 11px; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="title-group">
+        <h1>WSS Factory — Public Status Console</h1>
+        <p id="sys-meta">Connecting to /api/status...</p>
+      </div>
+      <div class="poll-indicator">
+        <span class="pulse-dot" id="poll-dot"></span>
+        <span id="poll-text">Polling 15s</span>
+      </div>
+    </header>
+
+    <!-- 1. Engine Identity -->
+    <section class="card">
+      <div class="card-title">1. Engine Identities (Live /api/status projection)</div>
+      <div class="grid-3" id="engines-container">
+        <div class="engine-box"><div class="engine-name">Loading engine artifacts...</div></div>
+      </div>
+    </section>
+
+    <!-- 2. Gate Scorecard -->
+    <section class="card">
+      <div class="card-title">
+        <span>2. Fleet Gate Scorecard (19 x 7 Grid)</span>
+        <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">Cap: 40,960 B | 111/133 gate cells PASS | all-7 clean: 5/19 | G-6: 13 PASS / 6 OVERAGE | Sweep 2026-10-06T02:08Z</span>
+      </div>
+      <div class="table-wrap">
+        <table id="scorecard-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>G-1 (NAP)</th>
+              <th>G-2 (Pal)</th>
+              <th>G-3 (Med)</th>
+              <th>G-4 (Don)</th>
+              <th>G-5 (Ver)</th>
+              <th>G-6 (Diet)</th>
+              <th>G-7 (Hyg)</th>
+            </tr>
+          </thead>
+          <tbody id="scorecard-body">
+            <tr><td colspan="8" class="empty-state">Loading gate scorecard...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 3. G-6 Tail Tracker -->
+    <section class="card">
+      <div class="card-title">3. G-6 Residual Tail Tracker (Active Invariant Hold)</div>
+      <div class="tail-grid" id="tail-container">
+        <!-- Injected via state -->
+      </div>
+    </section>
+
+    <!-- 4. Campaign Funnel -->
+    <section class="card">
+      <div class="card-title">4. Live Campaign Batches (line.batches)</div>
+      <div class="batch-list" id="funnel-container">
+        <div class="empty-state">Loading batches...</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // Exact G-6 overages, verified 1:1 against telemetry/gate-matrix-postdiet-20261006.json
+    // (post-diet sweep asOf 2026-10-06T02:08:26.715Z). Keys are the real fleet slugs.
+    const G6_TAIL_REGISTRY = {
+      "flight-training":     { overage: 274, rawBytes: 41234, tag: "trade candidate", note: "awaiting owner decision" },
+      "roofing":             { overage: 957, rawBytes: 41917, tag: "trade candidate", note: "awaiting owner decision" },
+      "roadside-assistance": { overage: 2260, rawBytes: 43220, tag: "trade candidate", note: "awaiting owner decision" },
+      "handyman":            { overage: 3005, rawBytes: 43965, tag: "trade candidate", note: "awaiting owner decision" },
+      "plumbing":            { overage: 3955, rawBytes: 44915, tag: "trade candidate", note: "awaiting owner decision" },
+      "landscaping":         { overage: 17385, rawBytes: 58345, tag: "structural: 16 services", note: "owner decision required" }
+    };
+
+    // Verified against telemetry/gate-matrix-postdiet-20261006.json (post-diet sweep,
+    // asOf 2026-10-06T02:08:26.715Z). Arrays are per-slug [G-1..G-7] snapshots.
+    // Per-gate: G-1 15/19 | G-2 10/19 | G-3 18/19 | G-4 19/19 | G-5 17/19 | G-6 13/19 | G-7 19/19.
+    const GATE_MATRIX = {
+      "landscaping":         ["PASS", "FAIL", "PASS", "PASS", "PASS", "FAIL", "PASS"],
+      "martial-arts":        ["PASS", "PASS", "PASS", "PASS", "PASS", "PASS", "PASS"],
+      "roofing":             ["PASS", "FAIL", "PASS", "PASS", "PASS", "FAIL", "PASS"],
+      "plumbing":            ["PASS", "PASS", "PASS", "PASS", "PASS", "FAIL", "PASS"],
+      "roadside-assistance": ["PASS", "FAIL", "PASS", "PASS", "PASS", "FAIL", "PASS"],
+      "flight-training":     ["PASS", "FAIL", "PASS", "PASS", "PASS", "FAIL", "PASS"],
+      "auto-detailing":      ["FAIL", "PASS", "PASS", "PASS", "PASS", "PASS", "PASS"],
+      "rv-repair":           ["FAIL", "FAIL", "FAIL", "PASS", "PASS", "PASS", "PASS"],
+      "tree-service":        ["PASS", "PASS", "PASS", "PASS", "PASS", "PASS", "PASS"],
+      "general-contractor":  ["PASS", "FAIL", "PASS", "PASS", "PASS", "PASS", "PASS"],
+      "concrete":            ["PASS", "PASS", "PASS", "PASS", "PASS", "PASS", "PASS"],
+      "electrical":          ["PASS", "PASS", "PASS", "PASS", "PASS", "PASS", "PASS"],
+      "real-estate-agent":   ["FAIL", "PASS", "PASS", "PASS", "FAIL", "PASS", "PASS"],
+      "fencing":             ["PASS", "FAIL", "PASS", "PASS", "PASS", "PASS", "PASS"],
+      "photographer":        ["FAIL", "PASS", "PASS", "PASS", "FAIL", "PASS", "PASS"],
+      "auto-repair":         ["PASS", "FAIL", "PASS", "PASS", "PASS", "PASS", "PASS"],
+      "mattress-store":      ["PASS", "PASS", "PASS", "PASS", "PASS", "PASS", "PASS"],
+      "handyman":            ["PASS", "PASS", "PASS", "PASS", "PASS", "FAIL", "PASS"],
+      "excavation":          ["PASS", "FAIL", "PASS", "PASS", "PASS", "PASS", "PASS"]
+    };
+
+    // Projection Allowlist filter: drops all non-allowlisted properties, credentials, and internal fields
+    function sanitizeStatus(raw) {
+      if (!raw || typeof raw !== "object") return null;
+
+      const out = {
+        timestamp: typeof raw.timestamp === "string" ? raw.timestamp : new Date().toISOString(),
+        engines: {},
+        batches: []
+      };
+
+      if (raw.engines && typeof raw.engines === "object") {
+        for (const key of ["compile-spa", "build-site", "build-prospect-v2"]) {
+          if (raw.engines[key]) {
+            out.engines[key] = {
+              md5: String(raw.engines[key].md5 || "").replace(/[^a-f0-9]/gi, ""),
+              bytes: Number(raw.engines[key].bytes) || 0,
+              modifiedAt: String(raw.engines[key].modifiedAt || "")
+            };
+          }
+        }
+      }
+
+      if (raw.line && Array.isArray(raw.line.batches)) {
+        out.batches = raw.line.batches.map(b => {
+          const rowsByStatusClean = {};
+          if (b.rowsByStatus && typeof b.rowsByStatus === "object") {
+            for (const [k, v] of Object.entries(b.rowsByStatus)) {
+              if (/^[a-z0-9_]+$/i.test(k) && typeof v === "number") {
+                rowsByStatusClean[k] = v;
+              }
+            }
+          }
+          return {
+            id: String(b.batchId || b.id || "").replace(/[^a-z0-9_]/gi, ""),
+            description: String(b.target || b.description || ""),
+            state: String(b.status || b.state || "unknown"),
+            requested: Number(b.requested) || 0,
+            total: Number((b.counts && b.counts.total) || b.total) || 0,
+            ready: Number((b.counts && b.counts.ready) || b.ready) || 0,
+            sent: Number((b.counts && b.counts.sent) || b.sent) || 0,
+            rowsByStatus: rowsByStatusClean
+          };
+        });
+      }
+
+      return out;
+    }
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function renderEngines(engines) {
+      const el = document.getElementById("engines-container");
+      const keys = ["compile-spa", "build-site", "build-prospect-v2"];
+      el.innerHTML = keys.map(k => {
+        const item = engines[k];
+        if (!item) return `<div class="engine-box"><div class="engine-name">${k}</div><div class="engine-meta">Missing telemetry</div></div>`;
+        return `
+          <div class="engine-box">
+            <div class="engine-name">${k}</div>
+            <div class="engine-meta">
+              <span>MD5: <span class="engine-md5">${item.md5 || "unknown"}</span></span>
+              <span>Size: ${item.bytes ? item.bytes.toLocaleString() + " B" : "n/a"}</span>
+              <span>Modified: ${item.modifiedAt ? esc(item.modifiedAt) : "n/a"}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderScorecard() {
+      const tbody = document.getElementById("scorecard-body");
+      tbody.innerHTML = Object.entries(GATE_MATRIX).map(([cat, gates]) => {
+        const cells = gates.map((state, idx) => {
+          if (state === "PASS") return `<td><span class="badge badge-pass">PASS</span></td>`;
+          if (idx === 5) {
+            const tail = G6_TAIL_REGISTRY[cat];
+            return `<td><span class="badge badge-over">+${tail.overage.toLocaleString()} B</span></td>`;
+          }
+          return `<td><span class="badge badge-over">FAIL</span></td>`;
+        }).join("");
+        return `
+          <tr>
+            <td><strong>${cat}</strong></td>
+            ${cells}
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderTailTracker() {
+      const container = document.getElementById("tail-container");
+      container.innerHTML = Object.entries(G6_TAIL_REGISTRY).map(([cat, data]) => {
+        const isStructural = data.tag.includes("structural");
+        return `
+          <div class="tail-card ${isStructural ? 'structural' : ''}">
+            <div class="tail-cat">${cat}</div>
+            <div class="tail-delta">+${data.overage.toLocaleString()} B over cap (${data.rawBytes.toLocaleString()} B raw)</div>
+            <div class="tail-note">Status: <strong>${data.tag}</strong> — ${data.note}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderFunnel(batches) {
+      const el = document.getElementById("funnel-container");
+      if (!batches || batches.length === 0) {
+        el.innerHTML = `<div class="empty-state">No batches reported by API.</div>`;
+        return;
+      }
+
+      el.innerHTML = batches.map(b => {
+        const hasRows = b.total > 0 || Object.keys(b.rowsByStatus).length > 0;
+        let rowsHtml = "";
+        if (!hasRows) {
+          rowsHtml = `<span class="empty-state">no rows yet</span>`;
+        } else {
+          rowsHtml = Object.entries(b.rowsByStatus)
+            .map(([status, count]) => `<span>${status}: <strong>${count}</strong></span>`)
+            .join("");
+        }
+
+        return `
+          <div class="batch-item">
+            <div class="batch-head">
+              <span>${esc(b.id)} ${b.description ? '— ' + esc(b.description) : ''}</span>
+              <span class="badge ${b.state === 'running' ? 'badge-pass' : 'badge-pending'}">${esc(b.state)}</span>
+            </div>
+            <div class="batch-status-row">
+              <span>Requested: <strong>${b.requested}</strong></span>
+              <span>Total Rows: <strong>${b.total}</strong></span>
+              <span>Ready: <strong>${b.ready}</strong></span>
+              <span>Sent: <strong>${b.sent}</strong></span>
+              ${rowsHtml ? `| ${rowsHtml}` : ''}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function pollStatus() {
+      const dot = document.getElementById("poll-dot");
+      const meta = document.getElementById("sys-meta");
+      try {
+        const res = await fetch("/api/status", { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const raw = await res.json();
+        const data = sanitizeStatus(raw);
+
+        dot.className = "pulse-dot";
+        meta.textContent = `Telemetry Live — Polled ${new Date().toLocaleTimeString()}`;
+
+        renderEngines(data.engines);
+        renderFunnel(data.batches);
+      } catch (err) {
+        dot.className = "pulse-dot stale";
+        meta.textContent = `Poll failed: ${err.message}. Retrying in 15s...`;
+      }
+    }
+
+    // Initialize UI
+    renderScorecard();
+    renderTailTracker();
+    pollStatus();
+    setInterval(pollStatus, 15000);
+  </script>
+</body>
+</html>
